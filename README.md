@@ -22,7 +22,7 @@ AnalyzeLockFile :: struct {
 main :: proc() {
 	arguments := os.args
 	if len(arguments) < 2 {
-		fmt.println("Usage: unthread -f=<file>|--filename=<file>")
+		fmt.println("Usage: unthread <command> arguments...")
 		os.exit(1)
 	}
 
