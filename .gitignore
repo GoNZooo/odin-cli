@@ -1,0 +1,4 @@
+.task
+*.bin
+/bin/
+./cli

@@ -1,0 +1,10 @@
+{
+	version: "0.0.1",
+	description: "A library for parsing command line arguments according to types",
+	url: "https://github.com/GoNZooo/odin-cli",
+	readme: "README.md",
+	license: "BSD-3",
+	keywords:["command-line", "cli"],
+	dependencies: {
+	}
+}

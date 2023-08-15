@@ -1,0 +1,25 @@
+version: 3
+
+tasks:
+  default:
+    cmds:
+      - task: test
+
+  test:
+    cmds:
+      - odin test .
+    sources:
+      - ./cli/**/*.odin
+    aliases:
+      - t
+    method: none
+    silent: true
+
+  clean:
+    cmds:
+      - rm -rf ./cli
+    aliases:
+      - c
+    silent: true
+
+interval: 250ms
