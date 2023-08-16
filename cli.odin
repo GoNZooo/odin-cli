@@ -210,6 +210,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	)
 }
 
+@(private = "file")
 make_argument_map :: proc(
 	arguments: []string,
 	allocator := context.allocator,
@@ -251,6 +252,7 @@ test_make_argument_map :: proc(t: ^testing.T) {
 	testing.expect_value(t, result["field-three"], "")
 }
 
+@(private = "file")
 parse_arguments_with_struct_cli_info :: proc(
 	cli_info: StructCliInfo,
 	arguments: []string,
@@ -306,6 +308,7 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 	)
 }
 
+@(private = "file")
 parse_arguments_with_union_cli_info :: proc(
 	cli_info: UnionCliInfo,
 	arguments: []string,
@@ -339,6 +342,7 @@ parse_arguments_with_union_cli_info :: proc(
 		}
 }
 
+@(private = "file")
 parse_argument_as_type :: proc(
 	argument: string,
 	t: typeid,
@@ -527,14 +531,17 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 	}
 }
 
+@(private = "file")
 field_name_to_long_name :: proc(name: string, allocator := context.allocator) -> string {
 	return strings.to_kebab_case(name, allocator)
 }
 
+@(private = "file")
 union_variant_name :: proc(name: string, allocator := context.allocator) -> string {
 	return strings.to_kebab_case(name, allocator)
 }
 
+@(private = "file")
 union_decoding_info :: proc(
 	type: typeid,
 	allocator := context.allocator,
@@ -601,6 +608,7 @@ test_field_name_to_long_name :: proc(t: ^testing.T) {
 	testing.expect_value(t, field_name_to_long_name("foo_bar_baz"), "foo-bar-baz")
 }
 
+@(private = "file")
 cli_tag_values :: proc(
 	field_name: string,
 	tag: reflect.Struct_Tag,
