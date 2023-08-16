@@ -9,7 +9,7 @@ tasks:
     cmds:
       - odin test .
     sources:
-      - ./cli/**/*.odin
+      - ./**/*.odin
     aliases:
       - t
     method: none

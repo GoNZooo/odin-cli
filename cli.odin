@@ -12,6 +12,7 @@ import "core:strconv"
 StructCliInfo :: struct {
 	type:   typeid,
 	size:   int,
+	name:   string,
 	fields: []FieldCliInfo,
 }
 
@@ -320,13 +321,13 @@ parse_arguments_with_union_cli_info :: proc(
 	value_bytes := make([]byte, cli_info.size, allocator)
 
 	for variant, i in cli_info.variants {
-		if arguments[0] == variant.cli_name {
+		variant_cli_info := struct_decoding_info(variant.payload, allocator) or_return
+		if arguments[0] == variant_cli_info.name {
 			variant_tag := i + cli_info.start_tag
 			copy(value_bytes[cli_info.tag_offset:], mem.any_to_bytes(variant_tag))
-			cli_info := struct_decoding_info(variant.payload, allocator) or_return
 
 			payload_bytes := parse_arguments_with_struct_cli_info(
-				cli_info,
+				variant_cli_info,
 				arguments[1:],
 				allocator,
 			) or_return
@@ -458,6 +459,7 @@ struct_decoding_info :: proc(
 	type_info := type_info_of(type)
 	cli_info.size = type_info.size
 	cli_info.type = type
+	cli_info.name = union_variant_name(fmt.tprintf("%v", type))
 	struct_fields := reflect.struct_fields_zipped(type)
 	cli_info.fields = make([]FieldCliInfo, len(struct_fields), allocator) or_return
 
@@ -522,6 +524,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 		},
 	}
 	testing.expect_value(t, cli_info.type, TestStruct)
+	testing.expect_value(t, cli_info.name, "test-struct")
 	for f, i in fields {
 		testing.expect(
 			t,

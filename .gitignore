@@ -1,4 +1,4 @@
 .task
 *.bin
 /bin/
-./cli
+/cli
