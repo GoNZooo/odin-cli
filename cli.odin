@@ -34,8 +34,7 @@ UnionCliInfo :: struct {
 }
 
 VariantCliInfo :: struct {
-	cli_name: string,
-	payload:  typeid,
+	payload: typeid,
 }
 
 CliTagValues :: struct {
@@ -186,7 +185,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 
 	ts: TestStruct
 	ts, error = parse_arguments_as_type(
-		{"-2=123", "--field-one=foo", "--no-tag=123.456", "--field-three"},
+		{"-2", "123", "--field-one", "foo", "--no-tag", "123.456", "--field-three", "true"},
 		TestStruct,
 		context.allocator,
 	)
@@ -199,7 +198,17 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 
 	tc: TestCommand
 	tc, error = parse_arguments_as_type(
-		{"test-struct", "-2=123", "--field-one=foo", "--no-tag=123.456", "--field-three"},
+		{
+			"test-struct",
+			"-2",
+			"123",
+			"--field-one",
+			"foo",
+			"--no-tag",
+			"123.456",
+			"--field-three",
+			"true",
+		},
 		TestCommand,
 		context.allocator,
 	)
@@ -221,20 +230,20 @@ make_argument_map :: proc(
 ) {
 	result = make(map[string]string, 0, allocator) or_return
 
-	for argument in arguments {
-		without_dash := strings.trim_left(argument, "-")
-		split_on_equals := strings.split(without_dash, "=", allocator) or_return
-		if len(split_on_equals) == 1 {
-			result[split_on_equals[0]] = ""
-		} else if len(split_on_equals) == 2 {
-			result[split_on_equals[0]] = split_on_equals[1]
-		} else {
+	for i := 0; i < len(arguments); {
+		if i == len(arguments) - 1 {
 			error = CliValueParseError {
-				message = fmt.tprintf("invalid flag argument: '%s'", argument),
+				message = fmt.tprintf("missing value for argument: '%s'", arguments[i]),
 			}
 
 			return result, error
 		}
+
+		argument := arguments[i]
+		value := arguments[i + 1]
+		without_dash := strings.trim_left(argument, "-")
+		result[without_dash] = value
+		i += 2
 	}
 
 	return result, nil
@@ -244,13 +253,22 @@ make_argument_map :: proc(
 test_make_argument_map :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
-	arguments := []string{"-2=123", "--field-one=foo", "--no-tag=123.456", "--field-three"}
+	arguments := []string{
+		"-2",
+		"123",
+		"--field-one",
+		"foo",
+		"--no-tag",
+		"123.456",
+		"--field-three",
+		"true",
+	}
 	result, error := make_argument_map(arguments, context.allocator)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, result["2"], "123")
 	testing.expect_value(t, result["field-one"], "foo")
 	testing.expect_value(t, result["no-tag"], "123.456")
-	testing.expect_value(t, result["field-three"], "")
+	testing.expect_value(t, result["field-three"], "true")
 }
 
 @(private = "file")
@@ -292,7 +310,16 @@ parse_arguments_with_struct_cli_info :: proc(
 test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
-	arguments := []string{"-2=123", "--field-one=foo", "--no-tag=123.456", "--field-three"}
+	arguments := []string{
+		"-2",
+		"123",
+		"--field-one",
+		"foo",
+		"--no-tag",
+		"123.456",
+		"--field-three",
+		"true",
+	}
 	ts_cli_info, cli_info_error := struct_decoding_info(TestStruct, context.allocator)
 	testing.expect_value(t, cli_info_error, nil)
 	ts_bytes, error := parse_arguments_with_struct_cli_info(
@@ -565,8 +592,7 @@ union_decoding_info :: proc(
 	variants := make([]VariantCliInfo, variant_count, allocator) or_return
 	for variant, i in union_info.variants {
 		variants[i] = VariantCliInfo {
-			payload  = variant.id,
-			cli_name = union_variant_name(fmt.tprintf("%v", variant.id)),
+			payload = variant.id,
 		}
 	}
 
@@ -587,7 +613,6 @@ test_union_decoding_info :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(cli_info.variants), 1)
 	if len(cli_info.variants) == 1 {
 		testing.expect_value(t, cli_info.variants[0].payload, TestStruct)
-		testing.expect_value(t, cli_info.variants[0].cli_name, "test-struct")
 	}
 
 	cli_info2, decoding_info_error2 := union_decoding_info(TestCommandNoNil)
@@ -598,9 +623,7 @@ test_union_decoding_info :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(cli_info2.variants), 2)
 	if len(cli_info2.variants) == 2 {
 		testing.expect_value(t, cli_info2.variants[0].payload, TestStruct)
-		testing.expect_value(t, cli_info2.variants[0].cli_name, "test-struct")
 		testing.expect_value(t, cli_info2.variants[1].payload, OtherStruct)
-		testing.expect_value(t, cli_info2.variants[1].cli_name, "other-struct")
 	}
 }
 
@@ -645,4 +668,77 @@ cli_tag_values :: proc(
 	case:
 		fmt.panicf("invalid `cli` tag format: '%s', should be `n,name`", tag)
 	}
+}
+
+@(private = "package")
+help_text_for_struct :: proc(
+	cli_info: StructCliInfo,
+	allocator := context.allocator,
+) -> (
+	result: string,
+	error: mem.Allocator_Error,
+) {
+	b := strings.builder_make_none(allocator) or_return
+	strings.write_string(&b, cli_info.name)
+	strings.write_byte(&b, ' ')
+
+	for f, i in cli_info.fields {
+		write_help_text_for_field(&b, f)
+		if i < len(cli_info.fields) - 1 {
+			strings.write_byte(&b, ' ')
+		}
+	}
+
+	return strings.to_string(b), nil
+}
+
+@(test, private = "package")
+test_help_text_for_struct :: proc(t: ^testing.T) {
+	context.logger = log.create_console_logger()
+
+	cli_info, decoding_info_error := struct_decoding_info(TestStruct)
+	testing.expect_value(t, decoding_info_error, nil)
+	help_text, help_text_error := help_text_for_struct(cli_info)
+	testing.expect_value(t, help_text_error, nil)
+	expected_help_text := "test-struct [-1|--field-one string] -2|--field-two int --field-three bool [--no-tag f32]"
+	testing.expect(
+		t,
+		help_text == expected_help_text,
+		fmt.tprintf("Expected help text to equal '%s', got '%s'", expected_help_text, help_text),
+	)
+	if help_text != expected_help_text {
+		for i := 0; i < len(help_text) && i < len(expected_help_text); i += 1 {
+			c := help_text[i]
+			if c != expected_help_text[i] {
+				fmt.printf("Difference at index %d: '%c' != '%c'\n", i, c, expected_help_text[i])
+				break
+			}
+		}
+	}
+}
+
+@(private = "file")
+write_help_text_for_field :: proc(
+	b: ^strings.Builder,
+	field: FieldCliInfo,
+) -> (
+	error: mem.Allocator_Error,
+) {
+	if !field.required {
+		strings.write_byte(b, '[')
+	}
+	if field.cli_short_name != "" {
+		strings.write_string(b, "-")
+		strings.write_string(b, field.cli_short_name)
+		strings.write_string(b, "|")
+	}
+	strings.write_string(b, "--")
+	strings.write_string(b, field.cli_long_name)
+	strings.write_string(b, " ")
+	reflect.write_typeid_builder(b, field.type)
+	if !field.required {
+		strings.write_byte(b, ']')
+	}
+
+	return nil
 }
