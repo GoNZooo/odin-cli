@@ -1,5 +1,6 @@
 package cli
 
+import "core:os"
 import "core:intrinsics"
 import "core:log"
 import "core:testing"
@@ -45,6 +46,11 @@ CliTagValues :: struct {
 
 TestCommand :: union {
 	TestStruct,
+}
+
+TestCommand2 :: union {
+	TestStruct,
+	OtherStruct,
 }
 
 TestCommandNoNil :: union #no_nil {
@@ -137,6 +143,9 @@ parse_arguments_as_type :: proc(
 
 	if reflect.is_struct(type_info_of(T)) {
 		cli_info := struct_decoding_info(T, allocator) or_return
+		if arguments[0] == "help" || arguments[0] == "-h" || arguments[0] == "--help" {
+			print_help_for_struct_and_exit(cli_info)
+		}
 		bytes := parse_arguments_with_struct_cli_info(cli_info, arguments, allocator) or_return
 		v := mem.reinterpret_copy(T, raw_data(bytes))
 
@@ -145,6 +154,10 @@ parse_arguments_as_type :: proc(
 
 	if reflect.is_union(type_info_of(T)) {
 		cli_info := union_decoding_info(T, allocator) or_return
+		if arguments[0] == "help" || arguments[0] == "-h" || arguments[0] == "--help" {
+			print_help_for_union_and_exit(cli_info)
+		}
+
 		bytes := parse_arguments_with_union_cli_info(cli_info, arguments, allocator) or_return
 		v := mem.reinterpret_copy(T, raw_data(bytes))
 
@@ -671,35 +684,36 @@ cli_tag_values :: proc(
 }
 
 @(private = "package")
-help_text_for_struct :: proc(
+write_help_text_for_struct :: proc(
+	b: ^strings.Builder,
 	cli_info: StructCliInfo,
 	allocator := context.allocator,
-) -> (
-	result: string,
-	error: mem.Allocator_Error,
-) {
-	b := strings.builder_make_none(allocator) or_return
-	strings.write_string(&b, cli_info.name)
-	strings.write_byte(&b, ' ')
+) -> mem.Allocator_Error {
+	strings.write_string(b, cli_info.name)
+	strings.write_byte(b, ' ')
 
 	for f, i in cli_info.fields {
-		write_help_text_for_field(&b, f)
+		write_help_text_for_field(b, f)
 		if i < len(cli_info.fields) - 1 {
-			strings.write_byte(&b, ' ')
+			strings.write_byte(b, ' ')
 		}
 	}
 
-	return strings.to_string(b), nil
+	return nil
 }
 
 @(test, private = "package")
-test_help_text_for_struct :: proc(t: ^testing.T) {
+test_write_help_text_for_struct :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
 	cli_info, decoding_info_error := struct_decoding_info(TestStruct)
 	testing.expect_value(t, decoding_info_error, nil)
-	help_text, help_text_error := help_text_for_struct(cli_info)
-	testing.expect_value(t, help_text_error, nil)
+
+	b, builder_init_error := strings.builder_make_none()
+	testing.expect_value(t, builder_init_error, nil)
+	write_help_text_for_struct(&b, cli_info)
+	help_text := strings.to_string(b)
+
 	expected_help_text := "test-struct [-1|--field-one string] -2|--field-two int --field-three bool [--no-tag f32]"
 	testing.expect(
 		t,
@@ -718,12 +732,48 @@ test_help_text_for_struct :: proc(t: ^testing.T) {
 }
 
 @(private = "file")
-write_help_text_for_field :: proc(
+write_help_text_for_union :: proc(
 	b: ^strings.Builder,
-	field: FieldCliInfo,
-) -> (
-	error: mem.Allocator_Error,
-) {
+	cli_info: UnionCliInfo,
+	allocator := context.allocator,
+) -> mem.Allocator_Error {
+	for v, i in cli_info.variants {
+		struct_cli_info, cli_info_error := struct_decoding_info(v.payload, allocator)
+		if cli_info_error != nil {
+			fmt.panicf("Error getting cli info for variant %s: %s", v.payload, cli_info_error)
+		}
+		write_help_text_for_struct(b, struct_cli_info, allocator)
+		if i < len(cli_info.variants) - 1 {
+			strings.write_byte(b, '\n')
+		}
+	}
+
+	return nil
+}
+
+@(test, private = "package")
+test_write_help_text_for_union :: proc(t: ^testing.T) {
+	context.logger = log.create_console_logger()
+
+	cli_info, decoding_info_error := union_decoding_info(TestCommand2)
+	testing.expect_value(t, decoding_info_error, nil)
+	b, builder_init_error := strings.builder_make_none()
+	testing.expect_value(t, builder_init_error, nil)
+	write_help_text_for_union(&b, cli_info)
+
+	help_text := strings.to_string(b)
+	expected_help_text :=
+		"test-struct [-1|--field-one string] -2|--field-two int --field-three bool [--no-tag f32]\n" +
+		"other-struct [--field-one string]"
+	testing.expect(
+		t,
+		help_text == expected_help_text,
+		fmt.tprintf("Expected help text to equal '%s', got '%s'", expected_help_text, help_text),
+	)
+}
+
+@(private = "file")
+write_help_text_for_field :: proc(b: ^strings.Builder, field: FieldCliInfo) {
 	if !field.required {
 		strings.write_byte(b, '[')
 	}
@@ -739,6 +789,30 @@ write_help_text_for_field :: proc(
 	if !field.required {
 		strings.write_byte(b, ']')
 	}
+}
 
-	return nil
+print_help_for_union_and_exit :: proc(
+	cli_info: UnionCliInfo,
+	allocator := context.allocator,
+) -> mem.Allocator_Error {
+	b := strings.builder_make_none(allocator) or_return
+	write_help_text_for_union(&b, cli_info, allocator) or_return
+	strings.write_byte(&b, '\n')
+	text := strings.to_string(b)
+	fmt.print(text)
+
+	os.exit(0)
+}
+
+print_help_for_struct_and_exit :: proc(
+	cli_info: StructCliInfo,
+	allocator := context.allocator,
+) -> mem.Allocator_Error {
+	b := strings.builder_make_none(allocator) or_return
+	write_help_text_for_struct(&b, cli_info, allocator) or_return
+	strings.write_byte(&b, '\n')
+	text := strings.to_string(b)
+	fmt.print(text)
+
+	os.exit(0)
 }
