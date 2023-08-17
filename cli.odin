@@ -69,6 +69,13 @@ TestStruct :: struct {
 	no_tag:      f32,
 }
 
+TestStructDifferentOrder :: struct {
+	field_three: bool `cli:"field-three/required"`,
+	field_one:   string `cli:"1,field-one"`,
+	no_tag:      f32,
+	field_two:   int `cli:"2,field-two/required"`,
+}
+
 CliParseError :: union {
 	mem.Allocator_Error,
 	CliValueParseError,
@@ -346,6 +353,29 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 		t,
 		ts,
 		TestStruct{field_one = "foo", field_two = 123, field_three = true, no_tag = 123.456},
+	)
+
+	ts_cli_info2, cli_info_error2 := struct_decoding_info(
+		TestStructDifferentOrder,
+		context.allocator,
+	)
+	testing.expect_value(t, cli_info_error2, nil)
+	ts_bytes2, error2 := parse_arguments_with_struct_cli_info(
+		ts_cli_info2,
+		arguments,
+		context.allocator,
+	)
+	testing.expect_value(t, error2, nil)
+	ts2 := mem.reinterpret_copy(TestStructDifferentOrder, raw_data(ts_bytes2))
+	testing.expect_value(
+		t,
+		ts2,
+		TestStructDifferentOrder{
+			field_one = "foo",
+			field_two = 123,
+			field_three = true,
+			no_tag = 123.456,
+		},
 	)
 }
 
