@@ -1,5 +1,6 @@
 package cli
 
+import "core:slice"
 import "core:os"
 import "core:intrinsics"
 import "core:log"
@@ -93,59 +94,13 @@ parse_arguments_as_type :: proc(
 	allocator := context.allocator,
 ) -> (
 	value: T,
+	remaining_arguments: []string,
 	error: CliParseError,
 ) {
-	when T == string {
-		return arguments[0], nil
-	} else when T == int {
-		i, ok := strconv.parse_int(arguments[0], 10)
-		if !ok {
-			return 0,
-				CliValueParseError{
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid integer value: '%s'", arguments[0]),
-				}
-		}
-
-		return i, nil
-	} else when T == f32 {
-		f, ok := strconv.parse_f32(arguments[0])
-		if !ok {
-			return 0,
-				CliValueParseError{
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
-				}
-		}
-
-		return f, nil
-	} else when T == f64 {
-		f, ok := strconv.parse_f64(arguments[0])
-		if !ok {
-			return 0,
-				CliValueParseError{
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
-				}
-		}
-
-		return f, nil
-	} else when T == bool {
-		if arguments[0] == "true" {
-			return true, nil
-		} else if arguments[0] == "false" {
-			return false, nil
-		} else {
-			return false,
-				CliValueParseError{
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid boolean value: '%s'", arguments[0]),
-				}
-		}
+	if len(arguments) == 0 {
+		return value,
+			[]string{},
+			CliValueParseError{value = "", type = T, message = "no arguments to read provided"}
 	}
 
 	if reflect.is_struct(type_info_of(T)) {
@@ -153,10 +108,14 @@ parse_arguments_as_type :: proc(
 		if arguments[0] == "help" || arguments[0] == "-h" || arguments[0] == "--help" {
 			print_help_for_struct_and_exit(cli_info)
 		}
-		bytes := parse_arguments_with_struct_cli_info(cli_info, arguments, allocator) or_return
+		bytes, remaining := parse_arguments_with_struct_cli_info(
+			cli_info,
+			arguments,
+			allocator,
+		) or_return
 		v := mem.reinterpret_copy(T, raw_data(bytes))
 
-		return v, nil
+		return v, remaining, nil
 	}
 
 	if reflect.is_union(type_info_of(T)) {
@@ -165,47 +124,168 @@ parse_arguments_as_type :: proc(
 			print_help_for_union_and_exit(cli_info)
 		}
 
-		bytes := parse_arguments_with_union_cli_info(cli_info, arguments, allocator) or_return
+		bytes, remaining := parse_arguments_with_union_cli_info(
+			cli_info,
+			arguments,
+			allocator,
+		) or_return
 		v := mem.reinterpret_copy(T, raw_data(bytes))
 
-		return v, nil
+		return v, remaining, nil
 	}
 
+	remaining_arguments = arguments[1:]
 
-	return value, nil
+	when T == string {
+		return arguments[0], remaining_arguments, nil
+	} else when T == int {
+		i, ok := strconv.parse_int(arguments[0], 10)
+		if !ok {
+			return 0,
+				arguments,
+				CliValueParseError{
+					value = arguments[0],
+					type = T,
+					message = fmt.tprintf("invalid integer value: '%s'", arguments[0]),
+				}
+		}
+
+		return i, remaining_arguments, nil
+	} else when T == f32 {
+		f, ok := strconv.parse_f32(arguments[0])
+		if !ok {
+			return 0,
+				arguments,
+				CliValueParseError{
+					value = arguments[0],
+					type = T,
+					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
+				}
+		}
+
+		return f, remaining_arguments, nil
+	} else when T == f64 {
+		f, ok := strconv.parse_f64(arguments[0])
+		if !ok {
+			return 0,
+				arguments,
+				CliValueParseError{
+					value = arguments[0],
+					type = T,
+					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
+				}
+		}
+
+		return f, remaining_arguments, nil
+	} else when T == bool {
+		if arguments[0] == "true" {
+			return true, remaining_arguments, nil
+		} else if arguments[0] == "false" {
+			return false, remaining_arguments, nil
+		} else {
+			return false,
+				arguments,
+				CliValueParseError{
+					value = arguments[0],
+					type = T,
+					message = fmt.tprintf("invalid boolean value: '%s'", arguments[0]),
+				}
+		}
+	}
+
+	return value, []string{}, nil
 }
 
 @(test, private = "package")
 test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
-	s, error := parse_arguments_as_type({"foo"}, string, context.allocator)
+	expected_arguments := []string{"bar"}
+	s, remaining_arguments, error := parse_arguments_as_type(
+		{"foo", "bar"},
+		string,
+		context.allocator,
+	)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, s, "foo")
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	i: int
-	i, error = parse_arguments_as_type({"123"}, int, context.allocator)
+	expected_arguments = []string{}
+	i, remaining_arguments, error = parse_arguments_as_type({"123"}, int, context.allocator)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, i, 123)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	float32: f32
-	float32, error = parse_arguments_as_type({"123.456"}, f32, context.allocator)
+	expected_arguments = []string{"hello", "there"}
+	float32, remaining_arguments, error = parse_arguments_as_type(
+		{"123.456", "hello", "there"},
+		f32,
+		context.allocator,
+	)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, float32, 123.456)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	float64: f64
-	float64, error = parse_arguments_as_type({"123.456"}, f64, context.allocator)
+	expected_arguments = []string{}
+	float64, remaining_arguments, error = parse_arguments_as_type(
+		{"123.456"},
+		f64,
+		context.allocator,
+	)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, float64, 123.456)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	b: bool
-	b, error = parse_arguments_as_type({"true"}, bool, context.allocator)
+	expected_arguments = []string{"true"}
+	b, remaining_arguments, error = parse_arguments_as_type(
+		{"true", "true"},
+		bool,
+		context.allocator,
+	)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, b, true)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	ts: TestStruct
-	ts, error = parse_arguments_as_type(
-		{"-2", "123", "--field-one", "foo", "--no-tag", "123.456", "--field-three", "true"},
+	expected_arguments = []string{"rest", "of", "arguments"}
+	ts, remaining_arguments, error = parse_arguments_as_type(
+		{
+			"-2",
+			"123",
+			"--field-one",
+			"foo",
+			"--no-tag",
+			"123.456",
+			"--field-three",
+			"true",
+			"rest",
+			"of",
+			"arguments",
+		},
 		TestStruct,
 		context.allocator,
 	)
@@ -215,9 +295,15 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 		ts,
 		TestStruct{field_one = "foo", field_two = 123, field_three = true, no_tag = 123.456},
 	)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	tc: TestCommand
-	tc, error = parse_arguments_as_type(
+	expected_arguments = []string{"rest", "of", "arguments"}
+	tc, remaining_arguments, error = parse_arguments_as_type(
 		{
 			"test-struct",
 			"-2",
@@ -228,6 +314,9 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 			"123.456",
 			"--field-three",
 			"true",
+			"rest",
+			"of",
+			"arguments",
 		},
 		TestCommand,
 		context.allocator,
@@ -238,6 +327,11 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 		tc,
 		TestStruct{field_one = "foo", field_two = 123, field_three = true, no_tag = 123.456},
 	)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 }
 
 @(private = "file")
@@ -246,6 +340,7 @@ make_argument_map :: proc(
 	allocator := context.allocator,
 ) -> (
 	result: map[string]string,
+	remaining_arguments: []string,
 	error: CliParseError,
 ) {
 	result = make(map[string]string, 0, allocator) or_return
@@ -256,7 +351,11 @@ make_argument_map :: proc(
 				message = fmt.tprintf("missing value for argument: '%s'", arguments[i]),
 			}
 
-			return result, error
+			return result, remaining_arguments, error
+		}
+
+		if !strings.has_prefix(arguments[i], "-") {
+			return result, arguments[i:], nil
 		}
 
 		argument := arguments[i]
@@ -266,7 +365,7 @@ make_argument_map :: proc(
 		i += 2
 	}
 
-	return result, nil
+	return result, []string{}, nil
 }
 
 @(test, private = "package")
@@ -282,13 +381,22 @@ test_make_argument_map :: proc(t: ^testing.T) {
 		"123.456",
 		"--field-three",
 		"true",
+		"rest",
+		"of",
+		"arguments",
 	}
-	result, error := make_argument_map(arguments, context.allocator)
+	expected_remaining_arguments := []string{"rest", "of", "arguments"}
+	result, remaining_arguments, error := make_argument_map(arguments, context.allocator)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, result["2"], "123")
 	testing.expect_value(t, result["field-one"], "foo")
 	testing.expect_value(t, result["no-tag"], "123.456")
 	testing.expect_value(t, result["field-three"], "true")
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_remaining_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 }
 
 @(private = "file")
@@ -298,10 +406,11 @@ parse_arguments_with_struct_cli_info :: proc(
 	allocator := context.allocator,
 ) -> (
 	result: []byte,
+	remaining_arguments: []string,
 	error: CliParseError,
 ) {
 	value_bytes := make([]byte, cli_info.size, allocator)
-	argument_map := make_argument_map(arguments, context.allocator) or_return
+	argument_map, remaining := make_argument_map(arguments, context.allocator) or_return
 	for field in cli_info.fields {
 		map_value: string
 		has_value: bool
@@ -317,13 +426,13 @@ parse_arguments_with_struct_cli_info :: proc(
 				message = fmt.tprintf("missing required argument: '%s'", field.cli_long_name),
 			}
 
-			return []byte{}, error
+			return []byte{}, arguments, error
 		}
 		parsed_value := parse_argument_as_type(map_value, field.type, allocator) or_return
 		copy(value_bytes[field.offset:], parsed_value)
 	}
 
-	return value_bytes, nil
+	return value_bytes, remaining, nil
 }
 
 @(test, private = "package")
@@ -339,10 +448,14 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 		"123.456",
 		"--field-three",
 		"true",
+		"rest",
+		"of",
+		"arguments",
 	}
+	expected_remaining_arguments := []string{"rest", "of", "arguments"}
 	ts_cli_info, cli_info_error := struct_decoding_info(TestStruct, context.allocator)
 	testing.expect_value(t, cli_info_error, nil)
-	ts_bytes, error := parse_arguments_with_struct_cli_info(
+	ts_bytes, remaining_arguments, error := parse_arguments_with_struct_cli_info(
 		ts_cli_info,
 		arguments,
 		context.allocator,
@@ -354,13 +467,18 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 		ts,
 		TestStruct{field_one = "foo", field_two = 123, field_three = true, no_tag = 123.456},
 	)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments, expected_remaining_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
 
 	ts_cli_info2, cli_info_error2 := struct_decoding_info(
 		TestStructDifferentOrder,
 		context.allocator,
 	)
 	testing.expect_value(t, cli_info_error2, nil)
-	ts_bytes2, error2 := parse_arguments_with_struct_cli_info(
+	ts_bytes2, remaining_arguments2, error2 := parse_arguments_with_struct_cli_info(
 		ts_cli_info2,
 		arguments,
 		context.allocator,
@@ -377,6 +495,11 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 			no_tag = 123.456,
 		},
 	)
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments2, expected_remaining_arguments),
+		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments2),
+	)
 }
 
 @(private = "file")
@@ -386,6 +509,7 @@ parse_arguments_with_union_cli_info :: proc(
 	allocator := context.allocator,
 ) -> (
 	result: []byte,
+	remaining_arguments: []string,
 	error: CliParseError,
 ) {
 	value_bytes := make([]byte, cli_info.size, allocator)
@@ -396,18 +520,19 @@ parse_arguments_with_union_cli_info :: proc(
 			variant_tag := i + cli_info.start_tag
 			copy(value_bytes[cli_info.tag_offset:], mem.any_to_bytes(variant_tag))
 
-			payload_bytes := parse_arguments_with_struct_cli_info(
+			payload_bytes, remaining := parse_arguments_with_struct_cli_info(
 				variant_cli_info,
 				arguments[1:],
 				allocator,
 			) or_return
 			copy(value_bytes[0:], payload_bytes)
 
-			return value_bytes, nil
+			return value_bytes, remaining, nil
 		}
 	}
 
 	return result,
+		arguments,
 		CliValueParseError{
 			message = fmt.tprintf("Unable to parse any variants from union '%v'", cli_info),
 		}
