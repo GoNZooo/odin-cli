@@ -927,6 +927,26 @@ test_write_help_text_for_union :: proc(t: ^testing.T) {
 	)
 }
 
+print_help_for_union_type_and_exit :: proc(
+	type: typeid,
+	allocator := context.allocator,
+) -> mem.Allocator_Error {
+	cli_info := union_decoding_info(type, allocator) or_return
+	print_help_for_union_and_exit(cli_info, allocator) or_return
+
+	return nil
+}
+
+print_help_for_struct_type_and_exit :: proc(
+	type: typeid,
+	allocator := context.allocator,
+) -> mem.Allocator_Error {
+	cli_info := struct_decoding_info(type, allocator) or_return
+	print_help_for_struct_and_exit(cli_info, allocator) or_return
+
+	return nil
+}
+
 @(private = "file")
 write_help_text_for_field :: proc(b: ^strings.Builder, field: FieldCliInfo) {
 	if !field.required {
@@ -946,6 +966,7 @@ write_help_text_for_field :: proc(b: ^strings.Builder, field: FieldCliInfo) {
 	}
 }
 
+@(private = "file")
 print_help_for_union_and_exit :: proc(
 	cli_info: UnionCliInfo,
 	allocator := context.allocator,
@@ -959,6 +980,7 @@ print_help_for_union_and_exit :: proc(
 	os.exit(0)
 }
 
+@(private = "file")
 print_help_for_struct_and_exit :: proc(
 	cli_info: StructCliInfo,
 	allocator := context.allocator,
