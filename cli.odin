@@ -77,7 +77,7 @@ TestStructDifferentOrder :: struct {
 	field_two:   int `cli:"2,field-two/required"`,
 }
 
-TestStructWithBadShortName :: struct {
+TestStructWithLongShortName :: struct {
 	field_one: string `cli:"f1,field-one/required"`,
 }
 
@@ -350,14 +350,6 @@ make_argument_map :: proc(
 	result = make(map[string]string, 0, allocator) or_return
 
 	for i := 0; i < len(arguments); {
-		if i == len(arguments) - 1 {
-			error = CliValueParseError {
-				message = fmt.tprintf("missing value for argument: '%s'", arguments[i]),
-			}
-
-			return result, remaining_arguments, error
-		}
-
 		if !strings.has_prefix(arguments[i], "-") {
 			return result, arguments[i:], nil
 		}
@@ -503,6 +495,31 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 		t,
 		slice.equal(remaining_arguments2, expected_remaining_arguments),
 		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments2),
+	)
+
+	arguments = []string{"-f1", "foo", "--field-2", "123", "--field-3", "true", "rest"}
+	expected_remaining_arguments = []string{"rest"}
+	ts_cli_info3, cli_info_error3 := struct_decoding_info(
+		TestStructWithLongShortName,
+		context.allocator,
+	)
+	testing.expect_value(t, cli_info_error3, nil)
+	ts_bytes3, remaining_arguments3, error3 := parse_arguments_with_struct_cli_info(
+		ts_cli_info3,
+		arguments,
+		context.allocator,
+	)
+	testing.expect_value(t, error3, nil)
+	ts3 := mem.reinterpret_copy(TestStructWithLongShortName, raw_data(ts_bytes3))
+	testing.expect_value(t, ts3, TestStructWithLongShortName{field_one = "foo"})
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments3, expected_remaining_arguments),
+		fmt.tprintf(
+			"Expected remaining arguments to equal %v, got: %v",
+			expected_remaining_arguments,
+			remaining_arguments3,
+		),
 	)
 }
 
@@ -732,18 +749,18 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 		)
 	}
 
-	// Test for bad short name
-	cli_info, allocator_error = struct_decoding_info(TestStructWithBadShortName)
+	// Test for long short name
+	cli_info, allocator_error = struct_decoding_info(TestStructWithLongShortName)
 	if allocator_error != nil {
 		fmt.panicf("Allocator error: %s", allocator_error)
 	}
-	fields = []FieldCliInfo {
+	fields = []FieldCliInfo{
 		{
 			name = "field_one",
 			type = string,
-			cli_short_name = "",
+			cli_short_name = "f1",
 			cli_long_name = "field-one",
-			offset = 0,// @NOTE: This is ignored when the short name is invalid
+			offset = 0,
 			required = true,
 			size = 16,
 		},
@@ -855,22 +872,7 @@ cli_tag_values :: proc(
 	case 1:
 		return CliTagValues{long = values[0], required = required}
 	case 2:
-		invalid_short_name := false
-		if len(values[0]) != 1 {
-			log.warnf(
-				"[WARNING] invalid short name ignored: '%s', short name should be one character",
-				values[0],
-			)
-			invalid_short_name = true
-		}
-
-		return(
-			CliTagValues{
-				short = values[0] if !invalid_short_name else "",
-				long = values[1],
-				required = required,
-			} \
-		)
+		return CliTagValues{short = values[0], long = values[1], required = required}
 	case:
 		fmt.panicf("invalid `cli` tag format: '%s', should be `n,name`", tag)
 	}
