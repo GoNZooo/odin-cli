@@ -77,6 +77,10 @@ TestStructDifferentOrder :: struct {
 	field_two:   int `cli:"2,field-two/required"`,
 }
 
+TestStructWithBadShortName :: struct {
+	field_one: string `cli:"f1,field-one/required"`,
+}
+
 CliParseError :: union {
 	mem.Allocator_Error,
 	CliValueParseError,
@@ -727,6 +731,30 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			fmt.tprintf("Expected %v, got %v", f, cli_info.fields[i]),
 		)
 	}
+
+	// Test for bad short name
+	cli_info, allocator_error = struct_decoding_info(TestStructWithBadShortName)
+	if allocator_error != nil {
+		fmt.panicf("Allocator error: %s", allocator_error)
+	}
+	fields = []FieldCliInfo {
+		{
+			name = "field_one",
+			type = string,
+			cli_short_name = "",
+			cli_long_name = "field-one",
+			offset = 0,// @NOTE: This is ignored when the short name is invalid
+			required = true,
+			size = 16,
+		},
+	}
+	for f, i in fields {
+		testing.expect(
+			t,
+			cli_info.fields[i] == f,
+			fmt.tprintf("Expected %v, got %v", f, cli_info.fields[i]),
+		)
+	}
 }
 
 @(private = "file")
@@ -827,12 +855,22 @@ cli_tag_values :: proc(
 	case 1:
 		return CliTagValues{long = values[0], required = required}
 	case 2:
-		assert(
-			len(values[0]) == 1,
-			fmt.tprintf("invalid `cli` tag format: '%s', short name should be one character", tag),
-		)
+		invalid_short_name := false
+		if len(values[0]) != 1 {
+			log.warnf(
+				"[WARNING] invalid short name ignored: '%s', short name should be one character",
+				values[0],
+			)
+			invalid_short_name = true
+		}
 
-		return CliTagValues{short = values[0], long = values[1], required = required}
+		return(
+			CliTagValues{
+				short = values[0] if !invalid_short_name else "",
+				long = values[1],
+				required = required,
+			} \
+		)
 	case:
 		fmt.panicf("invalid `cli` tag format: '%s', should be `n,name`", tag)
 	}
