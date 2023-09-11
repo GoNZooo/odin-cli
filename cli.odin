@@ -1,15 +1,15 @@
 package cli
 
-import "core:slice"
-import "core:os"
+import "core:fmt"
 import "core:intrinsics"
 import "core:log"
-import "core:testing"
-import "core:strings"
-import "core:reflect"
-import "core:fmt"
 import "core:mem"
+import "core:os"
+import "core:reflect"
+import "core:slice"
 import "core:strconv"
+import "core:strings"
+import "core:testing"
 
 StructCliInfo :: struct {
 	type:   typeid,
