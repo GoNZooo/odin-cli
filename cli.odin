@@ -341,6 +341,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 @(private = "file")
 make_argument_map :: proc(
 	arguments: []string,
+	cli_info: StructCliInfo,
 	allocator := context.allocator,
 ) -> (
 	result: map[string]string,
@@ -355,8 +356,30 @@ make_argument_map :: proc(
 		}
 
 		argument := arguments[i]
-		value := arguments[i + 1]
 		without_dash := strings.trim_left(argument, "-")
+		field_type: typeid
+		for field in cli_info.fields {
+			if field.cli_short_name == without_dash || field.cli_long_name == without_dash {
+				field_type = field.type
+				break
+			}
+		}
+		if i + 1 >= len(arguments) {
+			if field_type == bool {
+				result[without_dash] = "true"
+				i += 1
+				continue
+			}
+
+			return result,
+				arguments[i:],
+				CliValueParseError{
+					value = argument,
+					type = field_type,
+					message = "Expecting value for argument",
+				}
+		}
+		value := arguments[i + 1]
 		result[without_dash] = value
 		i += 2
 	}
@@ -382,7 +405,11 @@ test_make_argument_map :: proc(t: ^testing.T) {
 		"arguments",
 	}
 	expected_remaining_arguments := []string{"rest", "of", "arguments"}
-	result, remaining_arguments, error := make_argument_map(arguments, context.allocator)
+	result, remaining_arguments, error := make_argument_map(
+		arguments,
+		StructCliInfo{},
+		context.allocator,
+	)
 	testing.expect_value(t, error, nil)
 	testing.expect_value(t, result["2"], "123")
 	testing.expect_value(t, result["field-one"], "foo")
@@ -392,6 +419,68 @@ test_make_argument_map :: proc(t: ^testing.T) {
 		t,
 		slice.equal(remaining_arguments, expected_remaining_arguments),
 		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
+	)
+
+	arguments2 := []string{
+		"-2",
+		"123",
+		"--field-one",
+		"foo",
+		"--no-tag",
+		"123.456",
+		"--field-three",
+		"true",
+		"--inverted",
+	}
+	result2, remaining_arguments2, error2 := make_argument_map(
+		arguments2,
+		StructCliInfo{
+			fields = []FieldCliInfo{{name = "inverted", type = bool, cli_long_name = "inverted"}},
+		},
+		context.allocator,
+	)
+	testing.expect_value(t, error2, nil)
+	testing.expect_value(t, result2["2"], "123")
+	testing.expect_value(t, result2["field-one"], "foo")
+	testing.expect_value(t, result2["no-tag"], "123.456")
+	testing.expect_value(t, result2["field-three"], "true")
+	testing.expect_value(t, result2["inverted"], "true")
+	testing.expect(
+		t,
+		slice.equal(remaining_arguments2, []string{}),
+		fmt.tprintf(
+			"Expected remaining arguments to equal %v, got: %v",
+			[]string{},
+			remaining_arguments2,
+		),
+	)
+
+	arguments3 := []string{
+		"-2",
+		"123",
+		"--field-one",
+		"foo",
+		"--no-tag",
+		"123.456",
+		"--field-three",
+		"true",
+		"--count",
+	}
+	_, _, error3 := make_argument_map(
+		arguments3,
+		StructCliInfo{
+			fields = []FieldCliInfo{{name = "count", type = int, cli_long_name = "count"}},
+		},
+		context.allocator,
+	)
+	testing.expect_value(
+		t,
+		error3,
+		CliValueParseError{
+			value = "--count",
+			type = int,
+			message = "Expecting value for argument",
+		},
 	)
 }
 
@@ -406,7 +495,7 @@ parse_arguments_with_struct_cli_info :: proc(
 	error: CliParseError,
 ) {
 	value_bytes := make([]byte, cli_info.size, allocator)
-	argument_map, remaining := make_argument_map(arguments, context.allocator) or_return
+	argument_map, remaining := make_argument_map(arguments, cli_info, context.allocator) or_return
 	for field in cli_info.fields {
 		map_value: string
 		has_value: bool
