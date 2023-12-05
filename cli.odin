@@ -147,7 +147,7 @@ parse_arguments_as_type :: proc(
 		if !ok {
 			return 0,
 				arguments,
-				CliValueParseError{
+				CliValueParseError {
 					value = arguments[0],
 					type = T,
 					message = fmt.tprintf("invalid integer value: '%s'", arguments[0]),
@@ -160,7 +160,7 @@ parse_arguments_as_type :: proc(
 		if !ok {
 			return 0,
 				arguments,
-				CliValueParseError{
+				CliValueParseError {
 					value = arguments[0],
 					type = T,
 					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
@@ -173,7 +173,7 @@ parse_arguments_as_type :: proc(
 		if !ok {
 			return 0,
 				arguments,
-				CliValueParseError{
+				CliValueParseError {
 					value = arguments[0],
 					type = T,
 					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
@@ -189,7 +189,7 @@ parse_arguments_as_type :: proc(
 		} else {
 			return false,
 				arguments,
-				CliValueParseError{
+				CliValueParseError {
 					value = arguments[0],
 					type = T,
 					message = fmt.tprintf("invalid boolean value: '%s'", arguments[0]),
@@ -277,7 +277,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	ts: TestStruct
 	expected_arguments = []string{"rest", "of", "arguments"}
 	ts, remaining_arguments, error = parse_arguments_as_type(
-		{
+		 {
 			"-2",
 			"123",
 			"--field-one",
@@ -308,7 +308,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	tc: TestCommand
 	expected_arguments = []string{"rest", "of", "arguments"}
 	tc, remaining_arguments, error = parse_arguments_as_type(
-		{
+		 {
 			"test-struct",
 			"-2",
 			"123",
@@ -373,7 +373,7 @@ make_argument_map :: proc(
 
 			return result,
 				arguments[i:],
-				CliValueParseError{
+				CliValueParseError {
 					value = argument,
 					type = field_type,
 					message = "Expecting value for argument",
@@ -391,7 +391,7 @@ make_argument_map :: proc(
 test_make_argument_map :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
-	arguments := []string{
+	arguments := []string {
 		"-2",
 		"123",
 		"--field-one",
@@ -421,7 +421,7 @@ test_make_argument_map :: proc(t: ^testing.T) {
 		fmt.tprintf("Expected remaining arguments to equal %v, got: %v", remaining_arguments),
 	)
 
-	arguments2 := []string{
+	arguments2 := []string {
 		"-2",
 		"123",
 		"--field-one",
@@ -434,7 +434,7 @@ test_make_argument_map :: proc(t: ^testing.T) {
 	}
 	result2, remaining_arguments2, error2 := make_argument_map(
 		arguments2,
-		StructCliInfo{
+		StructCliInfo {
 			fields = []FieldCliInfo{{name = "inverted", type = bool, cli_long_name = "inverted"}},
 		},
 		context.allocator,
@@ -455,7 +455,7 @@ test_make_argument_map :: proc(t: ^testing.T) {
 		),
 	)
 
-	arguments3 := []string{
+	arguments3 := []string {
 		"-2",
 		"123",
 		"--field-one",
@@ -468,7 +468,7 @@ test_make_argument_map :: proc(t: ^testing.T) {
 	}
 	_, _, error3 := make_argument_map(
 		arguments3,
-		StructCliInfo{
+		StructCliInfo {
 			fields = []FieldCliInfo{{name = "count", type = int, cli_long_name = "count"}},
 		},
 		context.allocator,
@@ -476,7 +476,7 @@ test_make_argument_map :: proc(t: ^testing.T) {
 	testing.expect_value(
 		t,
 		error3,
-		CliValueParseError{
+		CliValueParseError {
 			value = "--count",
 			type = int,
 			message = "Expecting value for argument",
@@ -497,14 +497,9 @@ parse_arguments_with_struct_cli_info :: proc(
 	value_bytes := make([]byte, cli_info.size, allocator)
 	argument_map, remaining := make_argument_map(arguments, cli_info, context.allocator) or_return
 	for field in cli_info.fields {
-		map_value: string
-		has_value: bool
-		map_value, has_value = argument_map[field.cli_long_name]
+		map_value, has_value := argument_map[field.cli_long_name]
 		if !has_value && field.cli_short_name != "" {
 			map_value, has_value = argument_map[field.cli_short_name]
-		}
-		if has_value && field.type == bool && map_value == "" {
-			map_value = "true"
 		}
 		if !has_value && field.required {
 			error = CliValueParseError {
@@ -512,6 +507,11 @@ parse_arguments_with_struct_cli_info :: proc(
 			}
 
 			return []byte{}, arguments, error
+		} else if !has_value {
+			continue
+		}
+		if has_value && field.type == bool && map_value == "" {
+			map_value = "true"
 		}
 		parsed_value := parse_argument_as_type(map_value, field.type, allocator) or_return
 		copy(value_bytes[field.offset:], parsed_value)
@@ -524,7 +524,7 @@ parse_arguments_with_struct_cli_info :: proc(
 test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
-	arguments := []string{
+	arguments := []string {
 		"-2",
 		"123",
 		"--field-one",
@@ -573,7 +573,7 @@ test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 	testing.expect_value(
 		t,
 		ts2,
-		TestStructDifferentOrder{
+		TestStructDifferentOrder {
 			field_one = "foo",
 			field_two = 123,
 			field_three = true,
@@ -643,7 +643,7 @@ parse_arguments_with_union_cli_info :: proc(
 
 	return result,
 		arguments,
-		CliValueParseError{
+		CliValueParseError {
 			message = fmt.tprintf("Unable to parse any variants from union '%v'", cli_info),
 		}
 }
@@ -658,7 +658,10 @@ parse_argument_as_type :: proc(
 	error: CliParseError,
 ) {
 	if t == string {
-		return mem.any_to_bytes(argument), nil
+		v := mem.any_to_bytes(argument)
+		cloned := slice.clone(v, allocator) or_return
+
+		return cloned, nil
 	} else if t == int {
 		i, ok := strconv.parse_int(argument, 10)
 		if !ok {
@@ -668,8 +671,10 @@ parse_argument_as_type :: proc(
 
 			return result, error
 		}
+		v := mem.any_to_bytes(i)
+		cloned := slice.clone(v, allocator) or_return
 
-		return mem.any_to_bytes(i), nil
+		return cloned, nil
 	} else if t == f32 {
 		f, ok := strconv.parse_f32(argument)
 		if !ok {
@@ -679,8 +684,10 @@ parse_argument_as_type :: proc(
 
 			return result, error
 		}
+		v := mem.any_to_bytes(f)
+		cloned := slice.clone(v, allocator) or_return
 
-		return mem.any_to_bytes(f), nil
+		return cloned, nil
 	} else if t == f64 {
 		f, ok := strconv.parse_f64(argument)
 		if !ok {
@@ -690,13 +697,16 @@ parse_argument_as_type :: proc(
 
 			return result, error
 		}
+		v := mem.any_to_bytes(f)
+		cloned := slice.clone(v, allocator) or_return
 
-		return mem.any_to_bytes(f), nil
+		return cloned, nil
 	} else if t == bool {
+		v: []byte
 		if argument == "true" {
-			return mem.any_to_bytes(true), nil
+			v = mem.any_to_bytes(true)
 		} else if argument == "false" {
-			return mem.any_to_bytes(false), nil
+			v = mem.any_to_bytes(false)
 		} else {
 			error = CliValueParseError {
 				message = fmt.tprintf("invalid boolean: '%s'", argument),
@@ -704,6 +714,9 @@ parse_argument_as_type :: proc(
 
 			return result, error
 		}
+		cloned := slice.clone(v, allocator) or_return
+
+		return cloned, nil
 	} else {
 		error = CliValueParseError {
 			message = fmt.tprintf("unsupported type: %v", t),
@@ -790,8 +803,8 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 	if allocator_error != nil {
 		fmt.panicf("Allocator error: %s", allocator_error)
 	}
-	fields := []FieldCliInfo{
-		{
+	fields := []FieldCliInfo {
+		 {
 			name = "field_one",
 			type = string,
 			cli_short_name = "1",
@@ -800,7 +813,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			required = false,
 			size = 16,
 		},
-		{
+		 {
 			name = "field_two",
 			type = int,
 			cli_short_name = "2",
@@ -809,7 +822,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			required = true,
 			size = 8,
 		},
-		{
+		 {
 			name = "field_three",
 			type = bool,
 			cli_short_name = "",
@@ -818,7 +831,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			required = true,
 			size = 1,
 		},
-		{
+		 {
 			name = "no_tag",
 			type = f32,
 			cli_short_name = "",
@@ -843,8 +856,8 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 	if allocator_error != nil {
 		fmt.panicf("Allocator error: %s", allocator_error)
 	}
-	fields = []FieldCliInfo{
-		{
+	fields = []FieldCliInfo {
+		 {
 			name = "field_one",
 			type = string,
 			cli_short_name = "f1",
@@ -1121,4 +1134,41 @@ print_help_for_struct_and_exit :: proc(
 	fmt.print(text)
 
 	os.exit(0)
+}
+
+@(test, private = "package")
+test_edyu1 :: proc(t: ^testing.T) {
+	context.logger = log.create_console_logger()
+
+	Command :: union {
+		Encode,
+		Decode,
+	}
+
+	Encode :: struct {
+		N:     int `cli:"N,num-code"`,
+		K:     int `cli:"K,num-data"`,
+		w:     int `cli:"w,word-size"`,
+		input: string `cli:"i,input/required"`,
+		shard: string `cli:"s,shard/required"`,
+	}
+
+	Decode :: struct {
+		N:      int `cli:"N,num-code"`,
+		K:      int `cli:"K,num-data"`,
+		w:      int `cli:"w,word-size"`,
+		output: string `cli:"o,output/required"`,
+		shard:  string `cli:"s,shard/required"`,
+	}
+
+	arguments := []string{"decode", "--output", "blah.txt", "--shard", "encoded", "-N", "5"}
+	command, remaining, error := parse_arguments_as_type(arguments, Command, context.allocator)
+	testing.expect_value(t, error, nil)
+
+	testing.expect_value(
+		t,
+		command,
+		Decode{N = 5, K = 0, w = 0, output = "blah.txt", shard = "encoded"},
+	)
+	testing.expect_value(t, len(remaining), 0)
 }
