@@ -818,7 +818,7 @@ struct_decoding_info :: proc(
 
 	for f, i in struct_fields {
 		tag := reflect.struct_tag_get(f.tag, "cli")
-		tag_values := cli_tag_values(f.name, tag, allocator) or_return
+		tag_values := cli_tag_values(f.name, reflect.Struct_Tag(tag), allocator) or_return
 		field_type_info := type_info_of(f.type.id)
 		cli_info.fields[i].name = f.name
 		cli_info.fields[i].type = f.type.id

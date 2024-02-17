@@ -7,7 +7,7 @@ tasks:
 
   test:
     cmds:
-      - odin test . -out:bin/test -o:none -debug
+      - odin test . -out:bin/test.exe -o:none -debug
     sources:
       - ./**/*.odin
     aliases:
