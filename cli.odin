@@ -221,7 +221,7 @@ parse_arguments_as_type :: proc(
 	return value, []string{}, nil
 }
 
-@(test, private = "package")
+@(test)
 test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
@@ -406,7 +406,7 @@ make_argument_map :: proc(
 	return result, []string{}, nil
 }
 
-@(test, private = "package")
+@(test)
 test_make_argument_map :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
@@ -543,7 +543,7 @@ parse_arguments_with_struct_cli_info :: proc(
 	return value_bytes, remaining, nil
 }
 
-@(test, private = "package")
+@(test)
 test_parse_arguments_with_struct_cli_info :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
@@ -751,7 +751,7 @@ parse_argument_as_type :: proc(
 	}
 }
 
-@(test, private = "package")
+@(test)
 test_parse_argument_as_type :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
@@ -822,7 +822,7 @@ struct_decoding_info :: proc(
 	return cli_info, nil
 }
 
-@(test, private = "package")
+@(test)
 test_struct_decoding_info :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 	_tracking_allocator: mem.Tracking_Allocator
@@ -958,7 +958,7 @@ union_decoding_info :: proc(
 	return cli_info, nil
 }
 
-@(test, private = "package")
+@(test)
 test_union_decoding_info :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 	_tracking_allocator: mem.Tracking_Allocator
@@ -990,7 +990,7 @@ test_union_decoding_info :: proc(t: ^testing.T) {
 	}
 }
 
-@(test, private = "package")
+@(test)
 test_field_name_to_long_name :: proc(t: ^testing.T) {
 	testing.expect_value(t, field_name_to_long_name("foo"), "foo")
 	testing.expect_value(t, field_name_to_long_name("foo_bar"), "foo-bar")
@@ -1063,7 +1063,7 @@ write_help_text_for_struct :: proc(
 	return nil
 }
 
-@(test, private = "package")
+@(test)
 test_write_help_text_for_struct :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
@@ -1112,7 +1112,7 @@ write_help_text_for_union :: proc(
 	return nil
 }
 
-@(test, private = "package")
+@(test)
 test_write_help_text_for_union :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
@@ -1200,7 +1200,7 @@ print_help_for_struct_and_exit :: proc(
 	os.exit(0)
 }
 
-@(test, private = "package")
+@(test)
 test_memory_leaks_1 :: proc(t: ^testing.T) {
 	_tracking_allocator: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&_tracking_allocator, context.allocator)
@@ -1242,7 +1242,7 @@ test_memory_leaks_1 :: proc(t: ^testing.T) {
 	expect_no_leaks(t, _tracking_allocator)
 }
 
-@(test, private = "package")
+@(test)
 test_edyu1 :: proc(t: ^testing.T) {
 	context.logger = log.create_console_logger()
 
