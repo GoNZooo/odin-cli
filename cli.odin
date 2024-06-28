@@ -1,7 +1,7 @@
 package cli
 
+import "base:intrinsics"
 import "core:fmt"
-import "core:intrinsics"
 import "core:log"
 import "core:mem"
 import "core:os"
@@ -125,9 +125,11 @@ parse_arguments_as_type :: proc(
 	error: Cli_Parse_Error,
 ) {
 	if len(arguments) == 0 {
-		return value,
-			[]string{},
-			Cli_Value_Parse_Error{value = "", type = T, message = "no arguments to read provided"}
+		return value, remaining_arguments, Cli_Value_Parse_Error {
+			value = "",
+			type = T,
+			message = "no arguments to read provided",
+		}
 	}
 
 	if reflect.is_struct(type_info_of(T)) {
@@ -172,39 +174,33 @@ parse_arguments_as_type :: proc(
 	} else when T == int {
 		i, ok := strconv.parse_int(arguments[0], 10)
 		if !ok {
-			return 0,
-				arguments,
-				Cli_Value_Parse_Error {
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid integer value: '%s'", arguments[0]),
-				}
+			return 0, arguments, Cli_Value_Parse_Error {
+				value = arguments[0],
+				type = T,
+				message = fmt.tprintf("invalid integer value: '%s'", arguments[0]),
+			}
 		}
 
 		return i, remaining_arguments, nil
 	} else when T == f32 {
 		f, ok := strconv.parse_f32(arguments[0])
 		if !ok {
-			return 0,
-				arguments,
-				Cli_Value_Parse_Error {
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
-				}
+			return 0, arguments, Cli_Value_Parse_Error {
+				value = arguments[0],
+				type = T,
+				message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
+			}
 		}
 
 		return f, remaining_arguments, nil
 	} else when T == f64 {
 		f, ok := strconv.parse_f64(arguments[0])
 		if !ok {
-			return 0,
-				arguments,
-				Cli_Value_Parse_Error {
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
-				}
+			return 0, arguments, Cli_Value_Parse_Error {
+				value = arguments[0],
+				type = T,
+				message = fmt.tprintf("invalid float value: '%s'", arguments[0]),
+			}
 		}
 
 		return f, remaining_arguments, nil
@@ -214,13 +210,11 @@ parse_arguments_as_type :: proc(
 		} else if arguments[0] == "false" {
 			return false, remaining_arguments, nil
 		} else {
-			return false,
-				arguments,
-				Cli_Value_Parse_Error {
-					value = arguments[0],
-					type = T,
-					message = fmt.tprintf("invalid boolean value: '%s'", arguments[0]),
-				}
+			return false, arguments, Cli_Value_Parse_Error {
+				value = arguments[0],
+				type = T,
+				message = fmt.tprintf("invalid boolean value: '%s'", arguments[0]),
+			}
 		}
 	}
 
@@ -304,7 +298,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	ts: Test_Struct
 	expected_arguments = []string{"rest", "of", "arguments"}
 	ts, remaining_arguments, error = parse_arguments_as_type(
-		 {
+		{
 			"-2",
 			"123",
 			"--field-one",
@@ -335,7 +329,7 @@ test_parse_arguments_as_type :: proc(t: ^testing.T) {
 	tc: Test_Command
 	expected_arguments = []string{"rest", "of", "arguments"}
 	tc, remaining_arguments, error = parse_arguments_as_type(
-		 {
+		{
 			"test-struct",
 			"-2",
 			"123",
@@ -398,13 +392,11 @@ make_argument_map :: proc(
 				continue
 			}
 
-			return result,
-				arguments[i:],
-				Cli_Value_Parse_Error {
-					value = argument,
-					type = field_type,
-					message = "Expecting value for argument",
-				}
+			return result, arguments[i:], Cli_Value_Parse_Error {
+				value = argument,
+				type = field_type,
+				message = "Expecting value for argument",
+			}
 		}
 		value := arguments[i + 1]
 		result[without_dash] = value
@@ -676,11 +668,9 @@ parse_arguments_with_union_cli_info :: proc(
 		}
 	}
 
-	return result,
-		arguments,
-		Cli_Value_Parse_Error {
-			message = fmt.tprintf("Unable to parse any variants from union '%v'", cli_info),
-		}
+	return result, arguments, Cli_Value_Parse_Error {
+		message = fmt.tprintf("Unable to parse any variants from union '%v'", cli_info),
+	}
 }
 
 @(private = "file")
@@ -844,7 +834,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 		fmt.panicf("Allocator error: %s", allocator_error)
 	}
 	fields := []Field_Cli_Info {
-		 {
+		{
 			name = "field_one",
 			type = string,
 			cli_short_name = "1",
@@ -853,7 +843,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			required = false,
 			size = 16,
 		},
-		 {
+		{
 			name = "field_two",
 			type = int,
 			cli_short_name = "2",
@@ -862,7 +852,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			required = true,
 			size = 8,
 		},
-		 {
+		{
 			name = "field_three",
 			type = bool,
 			cli_short_name = "",
@@ -871,7 +861,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 			required = true,
 			size = 1,
 		},
-		 {
+		{
 			name = "no_tag",
 			type = f32,
 			cli_short_name = "",
@@ -903,7 +893,7 @@ test_struct_decoding_info :: proc(t: ^testing.T) {
 		fmt.panicf("Allocator error: %s", allocator_error)
 	}
 	fields = []Field_Cli_Info {
-		 {
+		{
 			name = "field_one",
 			type = string,
 			cli_short_name = "f1",
