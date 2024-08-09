@@ -29,7 +29,7 @@ main :: proc() {
 	// When we specify here that `Command` is the type that we want to parse
 	// `cli` will look at the possible union variants it has and try to parse
 	// them as kebab-case as well as their payloads.
-	command, cli_error := cli.parse_arguments_as_type(arguments[1:], Command)
+	command, remaining_arguments, cli_error := cli.parse_arguments_as_type(arguments[1:], Command)
 	if cli_error != nil {
 		fmt.println("Failed to parse arguments: ", cli_error)
 		os.exit(1)
